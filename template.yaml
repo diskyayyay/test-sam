@@ -1,0 +1,235 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: SAM API For Watchol
+
+Globals:
+  Function:
+    Timeout: 30
+  Api:
+    Auth:
+      Authorizers:
+        LambdaAuth:
+          FunctionArn: !GetAtt AuthLambdaFunction.Arn
+          Identity:
+            Header: Authorization
+
+Resources:
+  AuthLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/authentication
+      Handler: authentication.handler
+      MemorySize: 256
+      Runtime: nodejs18.x
+      Role: !Ref LambdaDeploymentRole
+      Policies:
+        - SecretsManagerReadPolicy
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref MyFormTable
+    Metadata:
+      FinTag: authForm
+
+  createForm:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: createForm
+      CodeUri: src/createForm
+      MemorySize: 256
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Role: !Ref LambdaDeploymentRole
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref MyFormTable
+    Metadata:
+      FinTag: submitForm
+
+  editForm:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: editForm
+      CodeUri: src/editForm
+      MemorySize: 256
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Role: !Ref LambdaDeploymentRole
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref MyFormTable
+    Metadata:
+      FinTag: submitForm
+  deleteForm:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: deleteForm
+      CodeUri: src/deleteForm
+      MemorySize: 256
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Role: !Ref LambdaDeploymentRole
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref MyFormTable
+    Metadata:
+      FinTag: submitForm
+
+  getAllForm:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: getAllForm
+      CodeUri: src/getAllForm
+      MemorySize: 256
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Role: !Ref LambdaDeploymentRole
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref MyFormTable
+          INDEX_NAME: PhoneNumberIndex
+    Metadata:
+      FinTag: getAllForm
+
+  submitForm:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: submitForm
+      MemorySize: 3008
+      CodeUri: src/submitForm
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Role: !Ref LambdaDeploymentRole
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref MyFormTable
+          INDEX_NAME: FormIdPhoneNumberIndex
+          QUEST_COUNT: 12
+    Metadata:
+      FinTag: submitForm
+
+  api:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref APIGateWayStageName
+      Cors:
+        AllowMethods: "'*'"
+        AllowHeaders: "'*'"
+        AllowOrigin: "'*'"
+      DefinitionBody:
+        swagger: 2.0
+        paths:
+          /createForm:
+            post:
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                type: aws_proxy
+                uri:
+                  Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${createForm.Arn}/invocations
+              responses: {}
+              security:
+                - LambdaAuth: []
+
+          /editForm:
+            post:
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                type: aws_proxy
+                uri:
+                  Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${editForm.Arn}/invocations
+              responses: {}
+              security:
+                - LambdaAuth: []
+          /deleteForm:
+            post:
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                type: aws_proxy
+                uri:
+                  Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${deleteForm.Arn}/invocations
+              responses: {}
+              security:
+                - LambdaAuth: []    
+          /getAllForm:
+            get:
+              x-amazon-apigateway-integration:
+                httpMethod: GET
+                type: aws_proxy
+                uri:
+                  Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${getAllForm.Arn}/invocations
+              responses: {}
+              security:
+                - LambdaAuth: []
+          /submitForm:
+            post:
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                type: aws_proxy
+                uri:
+                  Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${submitForm.Arn}/invocations
+              responses: {}
+    Metadata:
+      FinTag: /form 
+  MyFormTable:
+    Type: AWS::Serverless::Table
+    Properties:
+      TableName: FormTable
+      AttributeDefinitions:
+        - AttributeName: formId
+          AttributeType: S
+        - AttributeName: phoneNumber
+          AttributeType: S
+      KeySchema:
+        - AttributeName: formId
+          KeyType: HASH
+        - AttributeName: phoneNumber
+          KeyType: RANGE
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+      GlobalSecondaryIndexes:
+        - IndexName: "FormIdPhoneNumberIndex"
+          KeySchema:
+            - AttributeName: "formId"
+              KeyType: "HASH"
+            - AttributeName: "phoneNumber"
+              KeyType: "RANGE"
+          Projection:
+            ProjectionType: "ALL"
+          ProvisionedThroughput:
+            ReadCapacityUnits: "5"
+            WriteCapacityUnits: "5"
+        - IndexName: "FormIdIndex"
+          KeySchema:
+            - AttributeName: "formId"
+              KeyType: "HASH"
+          Projection:
+            ProjectionType: "ALL"
+          ProvisionedThroughput:
+            ReadCapacityUnits: "5"
+            WriteCapacityUnits: "5"
+        - IndexName: "PhoneNumberIndex"
+          KeySchema:
+            - AttributeName: "phoneNumber"
+              KeyType: "HASH"
+          Projection:
+            ProjectionType: "ALL"
+          ProvisionedThroughput:
+            ReadCapacityUnits: "5"
+            WriteCapacityUnits: "5"
+      
+    Metadata:
+      FinTag: FormTable
+Parameters:
+  ApiGatewayStageName:
+    Type: String
+    Description: The name of the environment (e.g., dev, prod).
+    AllowedValues:
+      - dev
+      - prod
+    Default: dev
+  LambdaDeploymentRole:
+    Type: String
+    Description: IAM Role ARN for API Gateway to call Lambda functions
+  
+            
+           

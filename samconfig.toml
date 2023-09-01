@@ -1,0 +1,13 @@
+# More information about the configuration file can be found here:
+# https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-config.html
+version = 0.1
+
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "sam-watchol-app"
+s3_bucket = "labstack-d649ad5b-330d-4f3b-8c0d-6d-samserverless-w81iwhq9x00"
+s3_prefix = "sam-app"
+region = "us-east-1"
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "StackName=\"\" APIGatewayStageName=\"dev\" LambdaDeploymentRole=\"arn:aws:iam::752941057615:role/LambdaDeploymentRole\""
